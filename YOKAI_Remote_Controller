@@ -1,0 +1,110 @@
+/*
+Project YOKAI (CONTROL)
+*/
+
+#include <SPI.h>
+
+#define EN          1
+#define CE          2
+#define PWR         3
+#define DR          4
+#define FWD         5
+#define BCK         6
+#define VERT        7
+#define LEFT        8
+#define RIGHT       9
+#define CLKSPD      10000000
+#define WRITEADD    0b00100010
+#define READADD     0b00100011
+#define WRITEDATA   0b00100000
+#define READDATA    0b00100001
+#define WRITECONF   0b00000101
+#define BRAIN       0x01
+#define CONTROL     0x00
+
+int config = 0;
+
+void setMode(String mode);
+void writeRegister(byte thisRegister, byte thisValue);
+unsigned int readRegister(byte thisRegister, int numOfBytes);
+
+void setup() {
+  pinMode(EN, OUTPUT);
+  pinMode(CE, OUTPUT);
+  pinMode(PWR, OUTPUT);
+  pinMode(FWD, INPUT);
+  digitalWrite(FWD, HIGH);
+  setMode("STANDBY");
+  SPI.beginTransaction(SPISettings(CLKSPD,MSBFIRST,SPI_MODE0));
+  delay(100);
+  config = (WRITECONF << 4) | CONTROL;
+  SPI.transfer(config);
+}
+
+void loop() {
+    if(digitalRead(FWD) == LOW){
+        writeRegister(BRAIN,0x32);
+        while(!digitalRead(DR));
+    }
+}
+
+void setMode(String mode){
+  int opt = 0;
+  if(mode = "TX"){
+    opt = 1;
+  }else if(mode = "RX"){
+    opt = 2;
+  }else if(mode = "STANDBY"){
+    opt = 3;
+  }else if(mode = "OFF"){
+    opt = 4;
+  }
+  switch(opt){
+    case 1:
+      digitalWrite(EN, HIGH);
+      digitalWrite(CE, HIGH);
+      digitalWrite(PWR, HIGH);
+      break;
+    case 2:
+      digitalWrite(EN, LOW);
+      digitalWrite(CE, HIGH);
+      digitalWrite(PWR, HIGH);
+      break;
+    case 3:
+      digitalWrite(EN, LOW);
+      digitalWrite(CE, LOW);
+      digitalWrite(PWR, HIGH);
+      break;
+    case 4:
+      digitalWrite(EN, LOW);
+      digitalWrite(CE, LOW);
+      digitalWrite(PWR, LOW);
+      break;
+  }
+}
+
+void writeRegister(byte thisRegister, byte thisValue){
+  byte addToSend = WRITEADD & thisRegister;
+  byte dataToSend = WRITEDATA & thisValue;
+  setMode("TX");
+  //Write the data address
+  SPI.transfer(addToSend);
+  //Write the data
+  SPI.transfer(dataToSend);
+}
+
+unsigned int readRegister(byte thisRegister, int numOfBytes){
+  byte inByte = 0;
+  unsigned int result = 0;
+  setMode("RX");
+  //Send the Read command and take the data
+  result = SPI.transfer(READDATA);
+  numOfBytes--;
+  while(numOfBytes > 0){
+    result = result << 8;
+    inByte = SPI.transfer(READDATA);
+    result = result | inByte;
+    numOfBytes--;
+  }
+  return result;
+}
